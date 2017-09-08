@@ -22,6 +22,19 @@ type Statistics struct {
 	Time    int
 }
 
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
+func rangeInt(min int, max int, n int) []int {
+	random := make([]int, n)
+	var i int
+	for i = 0; i <= n-1; i++ {
+		random[i] = rand.Intn(max) + min
+	}
+	return random
+}
+
 func clear() {
 	c := exec.Command("clear")
 	c.Stdout = os.Stdout
@@ -39,10 +52,7 @@ func getSession() (*mgo.Session, error) {
 }
 
 func getRandomNumbers(numCount int, seconds int) []int {
-	random := make([]int, numCount)
-	for i, value := range rand.Perm(numCount) {
-		random[i] = value
-	}
+	random := rangeInt(0, 100, numCount)
 	fmt.Printf("You have %d seconds to remember", seconds)
 	fmt.Print(random)
 	time.Sleep(time.Duration(seconds) * time.Second)

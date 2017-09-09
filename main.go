@@ -26,7 +26,7 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-func rangeInt(min int, max int, n int) []int {
+func randInt(min int, max int, n int) []int {
 	random := make([]int, n)
 	var i int
 	for i = 0; i <= n-1; i++ {
@@ -42,19 +42,18 @@ func clear() {
 }
 
 func getSession() (*mgo.Session, error) {
-	err := errors.New("Can not connect to DB")
 	session, err := mgo.Dial("localhost")
 	if err != nil {
-		fmt.Print(err)
+		panic(err)
 	}
 	session.SetMode(mgo.Monotonic, true)
 	return session, nil
 }
 
 func getRandomNumbers(numCount int, seconds int) []int {
-	random := rangeInt(0, 100, numCount)
+	random := randInt(0, 100, numCount)
 	fmt.Printf("You have %d seconds to remember", seconds)
-	fmt.Print(random)
+	fmt.Print("-->", random)
 	time.Sleep(time.Duration(seconds) * time.Second)
 	clear()
 	return random
@@ -66,7 +65,7 @@ func getRandomString(strCount int, seconds int) string {
 	for i := range random {
 		random[i] = letterBytes[rand.Intn(len(letterBytes))]
 	}
-	fmt.Print(string(random))
+	fmt.Print("-->", string(random))
 	time.Sleep(time.Duration(seconds) * time.Second)
 	clear()
 	return string(random)
@@ -74,25 +73,22 @@ func getRandomString(strCount int, seconds int) string {
 
 func scanNumbers(numCount int) ([]int, error) {
 	input := make([]int, numCount)
-	fmt.Print("Enter numbers: ")
-	fmt.Print("->")
+	fmt.Print("Enter numbers -->")
 	for i := range input {
-		_, err := fmt.Scan(&input[i])
+		_, err := fmt.Scanln(&input[i])
 		if err != nil {
-			return input[:i], errors.New("Cannot scan numbers")
+			return input[:i], err
 		}
 	}
 	return input, nil
 }
 
 func scanString() (string, error) {
-	err := errors.New("Cannot read string")
-	fmt.Print("Enter string: ")
+	fmt.Print("Enter string -->")
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("->")
 	text, err := reader.ReadString('\n')
 	if err != nil {
-		fmt.Print(err)
+		panic(err)
 	}
 	return text, nil
 }
@@ -108,7 +104,9 @@ func checkString(random string, input string, strCount int, seconds int) (int, e
 		}
 	}
 	percent = (wrong * 100) / strCount
-	err = collection.Insert(&Statistics{Name: "string", Count: strCount, Percent: percent, Time: seconds})
+	err = collection.Insert(
+		&Statistics{Name: "string", Count: strCount, Percent: percent, Time: seconds},
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -126,7 +124,9 @@ func checkNumbers(random []int, input []int, numCount int, seconds int) (int, er
 		}
 	}
 	percent = (wrong * 100) / numCount
-	err = collection.Insert(&Statistics{Name: "int", Count: numCount, Percent: percent, Time: seconds})
+	err = collection.Insert(
+		&Statistics{Name: "int", Count: numCount, Percent: percent, Time: seconds},
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -156,21 +156,25 @@ func main() {
 				numCount := c.Int("n")
 				if numCount <= 0 {
 					return errors.New(
-						"specified -n flag must be greater than zero",
+						"Specified -n flag must be greater than zero",
 					)
 				}
 				seconds := c.Int("t")
 				if seconds <= 0 {
-					return errors.New("Time cannot be negative or equal zero")
+					return errors.New("Time can't be negative or equal zero")
 				}
 				randomArray := getRandomNumbers(numCount, seconds)
 				numbers, err := scanNumbers(numCount)
 				if err != nil {
-					return errors.New("Cannot scan numbers")
+					return errors.New("Required numbers")
 				}
-				percentNum, err := checkNumbers(randomArray, numbers, numCount, seconds)
+				percentNum, err := checkNumbers(
+					randomArray, numbers, numCount, seconds,
+				)
 				if err != nil {
-					return errors.New("Cannot calculate percent")
+					return errors.New(
+						"Missed some parameters.Percent can't be calculated",
+					)
 				}
 				fmt.Println("Percent of wrong answers", percentNum)
 				return nil
@@ -181,7 +185,7 @@ func main() {
 			ShortName: "str",
 			Flags: []cli.Flag{
 				cli.IntFlag{
-					Name:  "n",
+					Name:  "n,strCount",
 					Usage: "Count of letters",
 					Value: 10,
 				},
@@ -194,20 +198,26 @@ func main() {
 			Action: func(c *cli.Context) error {
 				strCount := c.Int("n")
 				if strCount <= 0 {
-					return errors.New("strCount must be grater than zero")
+					return errors.New(
+						"Specified -n or -strCoutn flag must be grater than zero",
+					)
 				}
 				seconds := c.Int("t")
 				if seconds <= 0 {
-					return errors.New("Time cannot be negative")
+					return errors.New("Time can't be negative or equal zero")
 				}
 				randomStringArray := getRandomString(strCount, seconds)
 				stringByte, err := scanString()
 				if err != nil {
-					errors.New("Cannot scan string")
+					errors.New("Required string")
 				}
-				percentNumString, err := checkString(randomStringArray, stringByte, strCount, seconds)
+				percentNumString, err := checkString(
+					randomStringArray, stringByte, strCount, seconds,
+				)
 				if err != nil {
-					return errors.New("Cannot calculate percent")
+					return errors.New(
+						"Missed some parameters. Percent can't be calculated",
+					)
 				}
 				fmt.Println("Percent of wrong answers", percentNumString)
 				return nil

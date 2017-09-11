@@ -1,19 +1,25 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"math/rand"
 	"os"
 	"os/exec"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/urfave/cli"
 	"gopkg.in/mgo.v2"
 )
 
-const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+var letters = []string{"a", "b", "c", "d", "e", "f", "g",
+	"h", "i", "j", "k", "l", "m", "n",
+	"o", "p", "r", "s", "t", "u", "v", "w", "x",
+	"y", "z"}
+
+//const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 type Statistics struct {
 	Name    string
@@ -33,6 +39,20 @@ func randInt(min int, max int, n int) []int {
 		random[i] = rand.Intn(max) + min
 	}
 	return random
+}
+
+func validateString(input []string) error {
+	newInput := strings.Join(input, "")
+	for range newInput {
+		matched, err := regexp.MatchString("[a-z]", newInput)
+		if matched == false {
+			return errors.New("Required letters")
+		}
+		if err != nil {
+			panic(err)
+		}
+	}
+	return nil
 }
 
 func clear() {
@@ -59,16 +79,16 @@ func getRandomNumbers(numCount int, seconds int) []int {
 	return random
 }
 
-func getRandomString(strCount int, seconds int) string {
-	random := make([]byte, strCount)
+func getRandomString(strCount int, seconds int) []string {
+	random := make([]string, strCount)
 	fmt.Printf("You have %d seconds to remember", seconds)
 	for i := range random {
-		random[i] = letterBytes[rand.Intn(len(letterBytes))]
+		random[i] = letters[rand.Intn(len(letters))]
 	}
-	fmt.Print("-->", string(random))
+	fmt.Print("-->", []string(random))
 	time.Sleep(time.Duration(seconds) * time.Second)
 	clear()
-	return string(random)
+	return random
 }
 
 func scanNumbers(numCount int) ([]int, error) {
@@ -83,17 +103,19 @@ func scanNumbers(numCount int) ([]int, error) {
 	return input, nil
 }
 
-func scanString() (string, error) {
+func scanString(strCount int) ([]string, error) {
+	input := make([]string, strCount)
 	fmt.Print("Enter string -->")
-	reader := bufio.NewReader(os.Stdin)
-	text, err := reader.ReadString('\n')
-	if err != nil {
-		panic(err)
+	for i := range input {
+		_, err := fmt.Scanln(&input[i])
+		if err != nil {
+			return input[:i], err
+		}
 	}
-	return text, nil
+	return input, nil
 }
 
-func checkString(random string, input string, strCount int, seconds int) (int, error) {
+func checkString(random []string, input []string, strCount int, seconds int) (int, error) {
 	newSession, err := getSession()
 	collection := newSession.DB("test").C("str")
 	var wrong int
@@ -173,10 +195,10 @@ func main() {
 				)
 				if err != nil {
 					return errors.New(
-						"Missed some parameters.Percent can't be calculated",
+						"Percent can't be calculated",
 					)
 				}
-				fmt.Println("Percent of wrong answers", percentNum)
+				fmt.Println("Percent of wrong answers", percentNum, "%")
 				return nil
 			},
 		},
@@ -207,19 +229,17 @@ func main() {
 					return errors.New("Time can't be negative or equal zero")
 				}
 				randomStringArray := getRandomString(strCount, seconds)
-				stringByte, err := scanString()
-				if err != nil {
-					errors.New("Required string")
-				}
+				stringByte, err := scanString(strCount)
+				err = validateString(stringByte)
 				percentNumString, err := checkString(
 					randomStringArray, stringByte, strCount, seconds,
 				)
 				if err != nil {
 					return errors.New(
-						"Missed some parameters. Percent can't be calculated",
+						"Can't calculate percent",
 					)
 				}
-				fmt.Println("Percent of wrong answers", percentNumString)
+				fmt.Println("Percent of wrong answers", percentNumString, "%")
 				return nil
 			},
 		},

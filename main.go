@@ -19,8 +19,6 @@ var letters = []string{"a", "b", "c", "d", "e", "f", "g",
 	"o", "p", "r", "s", "t", "u", "v", "w", "x",
 	"y", "z"}
 
-//const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
 type Statistics struct {
 	Name    string
 	Count   int
@@ -49,7 +47,7 @@ func validateString(input []string) error {
 			return errors.New("Required letters")
 		}
 		if err != nil {
-			panic(err)
+			return err
 		}
 	}
 	return nil
@@ -70,8 +68,8 @@ func getSession() (*mgo.Session, error) {
 	return session, nil
 }
 
-func getRandomNumbers(numCount int, seconds int) []int {
-	random := randInt(0, 100, numCount)
+func getRandomNumbers(count int, seconds int) []int {
+	random := randInt(0, 100, count)
 	fmt.Printf("You have %d seconds to remember", seconds)
 	fmt.Print("-->", random)
 	time.Sleep(time.Duration(seconds) * time.Second)
@@ -79,8 +77,8 @@ func getRandomNumbers(numCount int, seconds int) []int {
 	return random
 }
 
-func getRandomString(strCount int, seconds int) []string {
-	random := make([]string, strCount)
+func getRandomString(count int, seconds int) []string {
+	random := make([]string, count)
 	fmt.Printf("You have %d seconds to remember", seconds)
 	for i := range random {
 		random[i] = letters[rand.Intn(len(letters))]
@@ -91,8 +89,8 @@ func getRandomString(strCount int, seconds int) []string {
 	return random
 }
 
-func scanNumbers(numCount int) ([]int, error) {
-	input := make([]int, numCount)
+func scanNumbers(count int) ([]int, error) {
+	input := make([]int, count)
 	fmt.Print("Enter numbers -->")
 	for i := range input {
 		_, err := fmt.Scanln(&input[i])
@@ -103,8 +101,8 @@ func scanNumbers(numCount int) ([]int, error) {
 	return input, nil
 }
 
-func scanString(strCount int) ([]string, error) {
-	input := make([]string, strCount)
+func scanString(count int) ([]string, error) {
+	input := make([]string, count)
 	fmt.Print("Enter string -->")
 	for i := range input {
 		_, err := fmt.Scanln(&input[i])
@@ -115,9 +113,7 @@ func scanString(strCount int) ([]string, error) {
 	return input, nil
 }
 
-func checkString(random []string, input []string, strCount int, seconds int) (int, error) {
-	newSession, err := getSession()
-	collection := newSession.DB("test").C("str")
+func getStringPercent(random []string, input []string, count int, seconds int) int {
 	var wrong int
 	var percent int
 	for i, _ := range random {
@@ -125,19 +121,11 @@ func checkString(random []string, input []string, strCount int, seconds int) (in
 			wrong = wrong + 1
 		}
 	}
-	percent = (wrong * 100) / strCount
-	err = collection.Insert(
-		&Statistics{Name: "string", Count: strCount, Percent: percent, Time: seconds},
-	)
-	if err != nil {
-		panic(err)
-	}
-	return percent, nil
+	percent = (wrong * 100) / count
+	return percent
 }
 
-func checkNumbers(random []int, input []int, numCount int, seconds int) (int, error) {
-	newSession, err := getSession()
-	collection := newSession.DB("test").C("int")
+func getNumPercent(random []int, input []int, count int, seconds int) int {
 	var wrong int
 	var percent int
 	for i, _ := range random {
@@ -145,16 +133,24 @@ func checkNumbers(random []int, input []int, numCount int, seconds int) (int, er
 			wrong = wrong + 1
 		}
 	}
-	percent = (wrong * 100) / numCount
-	err = collection.Insert(
-		&Statistics{Name: "int", Count: numCount, Percent: percent, Time: seconds},
-	)
-	if err != nil {
-		panic(err)
-	}
-	return percent, nil
+	percent = (wrong * 100) / count
+	return percent
 }
 
+func insertInDB(count int, percent int, seconds int, ShortName string) error {
+	newSession, err := getSession()
+	if err != nil {
+		return err
+	}
+	collection := newSession.DB("go").C("data")
+	err = collection.Insert(
+		&Statistics{Name: ShortName, Count: count, Percent: percent, Time: seconds},
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 func main() {
 	app := cli.NewApp()
 	app.Usage = "Try your memory. Choose numbers or string."
@@ -164,7 +160,7 @@ func main() {
 			ShortName: "num",
 			Flags: []cli.Flag{
 				cli.IntFlag{
-					Name:  "n, numCount",
+					Name:  "n, count",
 					Usage: "Count of numbers",
 					Value: 10,
 				},
@@ -175,8 +171,8 @@ func main() {
 				},
 			},
 			Action: func(c *cli.Context) error {
-				numCount := c.Int("n")
-				if numCount <= 0 {
+				count := c.Int("n")
+				if count <= 0 {
 					return errors.New(
 						"Specified -n flag must be greater than zero",
 					)
@@ -185,18 +181,17 @@ func main() {
 				if seconds <= 0 {
 					return errors.New("Time can't be negative or equal zero")
 				}
-				randomArray := getRandomNumbers(numCount, seconds)
-				numbers, err := scanNumbers(numCount)
+				randomArray := getRandomNumbers(count, seconds)
+				numbers, err := scanNumbers(count)
 				if err != nil {
 					return errors.New("Required numbers")
 				}
-				percentNum, err := checkNumbers(
-					randomArray, numbers, numCount, seconds,
+				percentNum := getNumPercent(
+					randomArray, numbers, count, seconds,
 				)
+				err = insertInDB(count, percentNum, seconds, "num")
 				if err != nil {
-					return errors.New(
-						"Percent can't be calculated",
-					)
+					return fmt.Errorf("Can't insert data: %s", err)
 				}
 				fmt.Println("Percent of wrong answers", percentNum, "%")
 				return nil
@@ -207,7 +202,7 @@ func main() {
 			ShortName: "str",
 			Flags: []cli.Flag{
 				cli.IntFlag{
-					Name:  "n,strCount",
+					Name:  "n,count",
 					Usage: "Count of letters",
 					Value: 10,
 				},
@@ -218,8 +213,8 @@ func main() {
 				},
 			},
 			Action: func(c *cli.Context) error {
-				strCount := c.Int("n")
-				if strCount <= 0 {
+				count := c.Int("n")
+				if count <= 0 {
 					return errors.New(
 						"Specified -n or -strCoutn flag must be grater than zero",
 					)
@@ -228,18 +223,23 @@ func main() {
 				if seconds <= 0 {
 					return errors.New("Time can't be negative or equal zero")
 				}
-				randomStringArray := getRandomString(strCount, seconds)
-				stringByte, err := scanString(strCount)
-				err = validateString(stringByte)
-				percentNumString, err := checkString(
-					randomStringArray, stringByte, strCount, seconds,
-				)
+				randomStringArray := getRandomString(count, seconds)
+				stringByte, err := scanString(count)
 				if err != nil {
-					return errors.New(
-						"Can't calculate percent",
-					)
+					return fmt.Errorf("Can't scan string: %s", err)
 				}
-				fmt.Println("Percent of wrong answers", percentNumString, "%")
+				err = validateString(stringByte)
+				if err != nil {
+					return fmt.Errorf("%s", err)
+				}
+				percentString := getStringPercent(
+					randomStringArray, stringByte, count, seconds,
+				)
+				err = insertInDB(count, percentString, seconds, "str")
+				if err != nil {
+					return fmt.Errorf("Can't insert data: %s", err)
+				}
+				fmt.Println("Percent of wrong answers", percentString, "%")
 				return nil
 			},
 		},

@@ -20,7 +20,6 @@ var letters = []string{"a", "b", "c", "d", "e", "f", "g",
 	"y", "z"}
 
 type Statistics struct {
-	Name    string
 	Count   int
 	Percent int
 	Time    int
@@ -137,20 +136,16 @@ func getNumPercent(random []int, input []int, count int, seconds int) int {
 	return percent
 }
 
-func insertInDB(count int, percent int, seconds int, ShortName string) error {
-	newSession, err := getSession()
-	if err != nil {
-		return err
-	}
-	collection := newSession.DB("go").C("data")
-	err = collection.Insert(
-		&Statistics{Name: ShortName, Count: count, Percent: percent, Time: seconds},
+func insertInDB(s *mgo.Session, c *mgo.Collection, count int, percent int, seconds int) error {
+	err := c.Insert(
+		&Statistics{Count: count, Percent: percent, Time: seconds},
 	)
 	if err != nil {
 		return err
 	}
 	return nil
 }
+
 func main() {
 	app := cli.NewApp()
 	app.Usage = "Try your memory. Choose numbers or string."
@@ -171,8 +166,8 @@ func main() {
 				},
 			},
 			Action: func(c *cli.Context) error {
-				count := c.Int("n")
-				if count <= 0 {
+				countOfNumbers := c.Int("n")
+				if countOfNumbers <= 0 {
 					return errors.New(
 						"Specified -n flag must be greater than zero",
 					)
@@ -181,19 +176,28 @@ func main() {
 				if seconds <= 0 {
 					return errors.New("Time can't be negative or equal zero")
 				}
-				randomArray := getRandomNumbers(count, seconds)
-				numbers, err := scanNumbers(count)
+
+				sessionForNumbers, err := getSession()
+				if err != nil {
+					return fmt.Errorf("%s", err)
+				}
+				collectionForNumbers := sessionForNumbers.DB("go").C("numbers")
+
+				randomNumbersArray := getRandomNumbers(countOfNumbers, seconds)
+				inputNumbersArray, err := scanNumbers(countOfNumbers)
 				if err != nil {
 					return errors.New("Required numbers")
 				}
-				percentNum := getNumPercent(
-					randomArray, numbers, count, seconds,
+				percentOfWrongNumbers := getNumPercent(
+					randomNumbersArray, inputNumbersArray, countOfNumbers, seconds,
 				)
-				err = insertInDB(count, percentNum, seconds, "num")
+				err = insertInDB(
+					sessionForNumbers, collectionForNumbers, countOfNumbers, percentOfWrongNumbers, seconds,
+				)
 				if err != nil {
 					return fmt.Errorf("Can't insert data: %s", err)
 				}
-				fmt.Println("Percent of wrong answers", percentNum, "%")
+				fmt.Println("Percent of wrong answers", percentOfWrongNumbers, "%")
 				return nil
 			},
 		},
@@ -213,33 +217,42 @@ func main() {
 				},
 			},
 			Action: func(c *cli.Context) error {
-				count := c.Int("n")
-				if count <= 0 {
+				countOfStrings := c.Int("n")
+				if countOfStrings <= 0 {
 					return errors.New(
-						"Specified -n or -strCoutn flag must be grater than zero",
+						"Specified -n or -count must be grater than zero",
 					)
 				}
 				seconds := c.Int("t")
 				if seconds <= 0 {
 					return errors.New("Time can't be negative or equal zero")
 				}
-				randomStringArray := getRandomString(count, seconds)
-				stringByte, err := scanString(count)
+
+				sessionForStrings, err := getSession()
+				if err != nil {
+					return err
+				}
+				collectionForStrings := sessionForStrings.DB("go").C("strings")
+
+				randomStringArray := getRandomString(countOfStrings, seconds)
+				inputStringArray, err := scanString(countOfStrings)
 				if err != nil {
 					return fmt.Errorf("Can't scan string: %s", err)
 				}
-				err = validateString(stringByte)
+				err = validateString(inputStringArray)
 				if err != nil {
 					return fmt.Errorf("%s", err)
 				}
-				percentString := getStringPercent(
-					randomStringArray, stringByte, count, seconds,
+				percentOfWrongString := getStringPercent(
+					randomStringArray, inputStringArray, countOfStrings, seconds,
 				)
-				err = insertInDB(count, percentString, seconds, "str")
+				err = insertInDB(
+					sessionForStrings, collectionForStrings, countOfStrings, percentOfWrongString, seconds,
+				)
 				if err != nil {
 					return fmt.Errorf("Can't insert data: %s", err)
 				}
-				fmt.Println("Percent of wrong answers", percentString, "%")
+				fmt.Println("Percent of wrong answers", percentOfWrongString, "%")
 				return nil
 			},
 		},

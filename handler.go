@@ -19,7 +19,6 @@ func handleNumbers(count int, seconds int, config Config) error {
 	}
 	collectionForNumbers := sessionForNumbers.DB(
 		config.Database["numbers"].DBName).C(config.Database["numbers"].Collection)
-	sessionForNumbers.SetMode(mgo.Monotonic, true)
 	//end
 
 	if count <= 0 {
@@ -51,7 +50,7 @@ func handleNumbers(count int, seconds int, config Config) error {
 		fmt.Printf("You have %d seconds to remember", seconds)
 		fmt.Print("-->", randomNumbersArray)
 		time.Sleep(time.Duration(seconds) * time.Second)
-		clearByTime()
+		clear()
 		err := getValuesForNumbers(
 			seconds, count, randomNumbersArray, sessionForNumbers,
 			collectionForNumbers,
@@ -73,7 +72,6 @@ func handleStrings(count int, seconds int, config Config) error {
 	}
 	collectionForStrings := sessionForStrings.DB(
 		config.Database["strings"].DBName).C(config.Database["strings"].Collection)
-	sessionForStrings.SetMode(mgo.Monotonic, true)
 	//end
 
 	if count <= 0 {
@@ -102,7 +100,7 @@ func handleStrings(count int, seconds int, config Config) error {
 		fmt.Printf("You have %d seconds to remember", seconds)
 		fmt.Print("-->", []string(randomStringsArray))
 		time.Sleep(time.Duration(seconds) * time.Second)
-		clearByTime()
+		clear()
 		err := getValuesForStrings(
 			seconds, count, randomStringsArray, sessionForStrings,
 			collectionForStrings,

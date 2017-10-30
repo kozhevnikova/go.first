@@ -8,6 +8,6 @@ func clearByEnter() {
 	print("\033[H\033[2J")
 }
 
-func clearByTime() {
+func clear() {
 	print("\033[H\033[2J")
 }

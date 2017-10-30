@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<head>
+    <script src="./plotly-latest.min.js"></script>
+</head>
+<body>
+    <div id="myDiv"></div>
+            <script>
+                Plotly.d3.csv("./data.csv", function(err,rows){
+                    function unpack(rows, key){
+                        console.log(rows)
+                        return rows.map(function(row){return row[key];});
+                    }
+
+                    var trace = {
+                        type:"scatter",
+                        mode: "lines",
+                        name:"Graph",
+                        x: unpack(rows, 'count'),
+                        y: unpack(rows, 'percent'),
+                        line: {color: '#17BECF'}
+                    }
+                    var data = [trace]
+                    var layout = {
+                        title: 'D Chart',
+                    };
+                    Plotly.newPlot('myDiv', data, layout);
+                })
+            </script>
+</body>
+</html>
+
+
+
